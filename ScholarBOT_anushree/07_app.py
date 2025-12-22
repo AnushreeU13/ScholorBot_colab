@@ -90,8 +90,17 @@ if prompt := st.chat_input("Ask a clinical question..."):
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
             # Pass the model_name
-            response, confidence = st.session_state.engine.generate_response(prompt, model_name=model_name)
+            # expects: content, confidence, meta
+            response, confidence, meta = st.session_state.engine.generate_response(prompt, model_name=model_name)
+            
             st.markdown(response)
+            
+            # Show Refined Citation
+            with st.expander("📚 Source Citation (Refined)", expanded=True):
+                st.markdown(f"**Title**: {meta.get('title')}")
+                st.markdown(f"**Author**: {meta.get('author')}")
+                st.markdown(f"**File**: `{meta.get('source')}`")
+            
             st.caption(f"Confidence: {confidence:.3f} (Generative: {model_name})")
             
     # Add Assistant Message

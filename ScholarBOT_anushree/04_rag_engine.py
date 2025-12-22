@@ -156,13 +156,13 @@ class ScholarBotEngine:
 
         # Tier 1: User KB
         if self.user_kb:
-            user_docs = self.user_kb.similarity_search_with_relevance_scores(query, k=7)
+            user_docs = self.user_kb.similarity_search_with_relevance_scores(query, k=10)
             result = process_results(user_docs, "user_doc")
             if result: return result
 
         # Tier 2: Main KB
         if self.main_kb:
-            main_docs = self.main_kb.similarity_search_with_relevance_scores(query, k=7)
+            main_docs = self.main_kb.similarity_search_with_relevance_scores(query, k=10)
             result = process_results(main_docs, "main_kb")
             if result: return result
         
@@ -174,22 +174,43 @@ class ScholarBotEngine:
 
 
 
+# ... imports ...
+import importlib.util
+from pathlib import Path
+# ADDED: Citation Refiner
+citation_spec = importlib.util.spec_from_file_location("cit", Path(__file__).parent / "08_citation_refiner.py")
+citation_lib = importlib.util.module_from_spec(citation_spec)
+citation_spec.loader.exec_module(citation_lib)
+
+# ... (ScholarBotEngine class) ...
+
     def generate_response(self, query: str, model_name: str = "llama3"):
         """
         Generative RAG (Ollama):
         1. Retrieve massive context (k=10).
         2. Use Local Ollama Model to synthesize.
         """
-        # Always use high K for generative
+        # User requested 10 chunks
         retrieval_k = 10
         
-        retrieval = self.search(query)
+        # NOTE: self.search currently hardcodes k=7 inside. 
+        # To respect the user request without "meddling" too much,
+        # we honestly should have updated search() to accept k, but for now
+        # let's assume search() gets enough, or we rely on the 7 chunks being "good enough".
+        # WAIT, user said "retrieve 10 chunks". I MUST update search to k=10.
+        
+        retrieval = self.search(query) # I will update search k below
         
         if retrieval["status"] == "abstain":
              return "Final Answer: No confidence in answering.", 0.0
 
         ctx = retrieval["excerpt_1"]
-        meta = retrieval["excerpt_2"]
+        raw_meta = retrieval["excerpt_2"]
+        
+        # --- NEW: REFINE CITATION ---
+        # "Read the doc again" logic
+        file_path = raw_meta.get("file_path", "")
+        refined_meta = citation_lib.refine_citation(file_path, raw_meta)
         
         # -------------------------------------------
         # PATH A: GENERATIVE (Local LLM)
@@ -223,11 +244,11 @@ class ScholarBotEngine:
                 "question": query
             })
             
-            return response_msg.content, retrieval['confidence']
+            return response_msg.content, retrieval['confidence'], refined_meta
             
         except Exception as e:
             fallback_msg = f"**Ollama Error**: {str(e)}\n\n*Ensure Ollama is running (`ollama serve`) and `{model_name}` is pulled.*\n\n---\n\n**Raw Context**:\n{ctx}"
-            return fallback_msg, 0.0
+            return fallback_msg, 0.0, refined_meta
 
         # -------------------------------------------
         # PATH B: EXTRACTIVE (Legacy)
