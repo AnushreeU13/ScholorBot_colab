@@ -20,6 +20,11 @@ utils_spec = importlib.util.spec_from_file_location("utils", Path(__file__).pare
 utils = importlib.util.module_from_spec(utils_spec)
 utils_spec.loader.exec_module(utils)
 
+# Load Citation Refiner
+citation_spec = importlib.util.spec_from_file_location("cit", Path(__file__).parent / "05_citations.py")
+citation_lib = importlib.util.module_from_spec(citation_spec)
+citation_spec.loader.exec_module(citation_lib)
+
 CFG = utils.CFG
 
 class ScholarBotEngine:
@@ -174,15 +179,6 @@ class ScholarBotEngine:
 
 
 
-# ... imports ...
-import importlib.util
-from pathlib import Path
-# ADDED: Citation Refiner
-citation_spec = importlib.util.spec_from_file_location("cit", Path(__file__).parent / "08_citation_refiner.py")
-citation_lib = importlib.util.module_from_spec(citation_spec)
-citation_spec.loader.exec_module(citation_lib)
-
-# ... (ScholarBotEngine class) ...
 
     def generate_response(self, query: str, model_name: str = "llama3"):
         """
