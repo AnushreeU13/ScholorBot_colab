@@ -159,16 +159,18 @@ class ScholarBotEngine:
                 "confidence": valid_docs[0][1]
             }
 
-        # Tier 1: User KB
-        if self.user_kb:
-            user_docs = self.user_kb.similarity_search_with_relevance_scores(query, k=10)
-            result = process_results(user_docs, "user_doc")
-            if result: return result
-
-        # Tier 2: Main KB
+        # Tier 1: Main KB (PRIORITY: System Guidelines)
+        print("[INFO] Searching Main KB (Priority)...")
         if self.main_kb:
             main_docs = self.main_kb.similarity_search_with_relevance_scores(query, k=10)
             result = process_results(main_docs, "main_kb")
+            if result: return result
+            
+        # Tier 2: User KB (Fallback: Specific Uploads)
+        print("[INFO] Main KB insufficient. Searching User KB...")
+        if self.user_kb:
+            user_docs = self.user_kb.similarity_search_with_relevance_scores(query, k=10)
+            result = process_results(user_docs, "user_doc")
             if result: return result
         
         return {

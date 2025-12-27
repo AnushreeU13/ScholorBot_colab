@@ -87,30 +87,60 @@ def load_and_chunk_pdf(pdf_path: Path) -> List[Any]:
     file_name = pdf_path.stem  # e.g., "WHO_TB_Consolidated_Guidelines"
     creation_time = datetime.fromtimestamp(pdf_path.stat().st_mtime).year
     
-    # Simple heuristic to extract Year from filename if present (e.g. "...2019")
-    year_match = re.search(r"(19|20)\d{2}", file_name)
-    year = year_match.group(0) if year_match else str(creation_time)
+    # --- SCAN 1: TITLE & AUTHOR (Page 1) ---
+    extracted_title = file_name.replace("_", " ").replace("-", " ").title()
+    extracted_author = "Unknown Author"
     
-    # Heuristic for Author/Org
-    if "who" in file_name.lower():
-        author = "World Health Organization"
-    elif "cdc" in file_name.lower():
-        author = "Centers for Disease Control and Prevention"
-    elif "ats" in file_name.lower() or "idsa" in file_name.lower():
-        author = "American Thoracic Society / IDSA"
-    else:
-        author = "Unknown Author"
+    if "who" in file_name.lower(): extracted_author = "World Health Organization"
+    elif "cdc" in file_name.lower(): extracted_author = "CDC"
+    
+    if pages:
+        first_page = pages[0].page_content
+        lines = [l.strip() for l in first_page.split('\n') if l.strip()]
+        
+        # Heuristic: First clean line > 5 chars is likely title
+        junk = ["volume", "issue", "doi", "http", "jbp", "review article", "original article", "issn"]
+        for line in lines[:20]:
+            if len(line) < 5: continue
+            if any(j in line.lower() for j in junk): continue
+            
+            # Found likely title
+            extracted_title = line
+            break
+
+    # --- SCAN 2: REFERENCES (Last 3 Pages) ---
+    references = []
+    try:
+        num_pages = len(pages)
+        start_search = max(0, num_pages - 3)
+        ref_text = "\n".join([p.page_content for p in pages[start_search:]])
+        
+        match = re.search(r'(?i)^\s*(References|Bibliography|LITERATURA CITADA)\s*$', ref_text, re.MULTILINE)
+        if match:
+            post_ref = ref_text[match.end():]
+            ref_lines = [l.strip() for l in post_ref.split('\n') if l.strip()]
+            count = 0
+            for rl in ref_lines:
+                if len(rl) < 10: continue
+                references.append(rl)
+                count += 1
+                if count >= 5: break
+    except Exception:
+        pass
 
     splitter = get_text_splitter()
     chunks = splitter.split_documents(pages)
 
-    # Update metadata for all chunks
+    # --- STAMP METADATA ---
     for chunk in chunks:
         chunk.metadata["source"] = str(pdf_path.name)
-        chunk.metadata["title"] = file_name.replace("_", " ").replace("-", " ").title()
-        chunk.metadata["author"] = author
-        chunk.metadata["year"] = year
+        chunk.metadata["title"] = extracted_title
+        chunk.metadata["author"] = extracted_author
+        # Simple Year Heuristic
+        year_match = re.search(r"(19|20)\d{2}", file_name)
+        chunk.metadata["year"] = year_match.group(0) if year_match else str(creation_time)
         chunk.metadata["file_path"] = str(pdf_path)
+        chunk.metadata["references"] = references # Embedding the list directly
 
     return chunks
 

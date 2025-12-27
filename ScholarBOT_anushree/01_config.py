@@ -24,6 +24,7 @@ KB_USER_INDEX_DIR = FAISS_ROOT / "user_kb"     # For user-uploaded docs
 DATA_SOURCES = [
     Path(r"C:\Users\au11\Box\ScholarBOT\pneumonia"),
     Path(r"C:\Users\au11\Box\ScholarBOT\Tuberculosis"),
+    Path(r"C:\Users\au11\Box\ScholarBOT\guidelines"), # Added per user request
 ]
 
 # Staging area for user uploads before ingestion
