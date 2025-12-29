@@ -105,9 +105,6 @@ if prompt := st.chat_input("Ask a clinical question..."):
             st.markdown(response)
             
             # Show Refined Citation (Flat Layout)
-            st.markdown("---")
-            # Show Refined Citation (Flat Layout)
-            st.markdown("---")
             st.markdown("**Source Document**") # Subtle header
             st.markdown(f"**Title**: {meta.get('title', 'Unknown')}")
             st.markdown(f"**File**: `{meta.get('source', 'Unknown')}`")
