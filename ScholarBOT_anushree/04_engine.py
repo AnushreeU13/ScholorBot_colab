@@ -88,9 +88,10 @@ class ScholarBotEngine:
             
         return False
 
-    def search(self, query: str) -> Dict:
+    def search(self, query: str, force_user_kb: bool = False) -> Dict:
         """
-        Performs the tiered search with Deep Retrieval (k=7) for ~1500 word potential.
+        Performs the tiered search with Deep Retrieval (k=7).
+        force_user_kb: If True, restricts search to User KB (for "Chat with PDF" mode).
         """
         # Common logic for both tiers to ensure consistent formatting
         def process_results(docs, source_name):
@@ -159,6 +160,21 @@ class ScholarBotEngine:
                 "confidence": valid_docs[0][1]
             }
 
+        # --- MODE 1: USER KB ONLY (For "Context: Uploaded Doc") ---
+        if force_user_kb:
+            print("[INFO] Search Mode: Force User KB Only")
+            if self.user_kb:
+                user_docs = self.user_kb.similarity_search_with_relevance_scores(query, k=10)
+                result = process_results(user_docs, "user_doc")
+                if result: return result
+            
+            # If forced and failed, return abstain (Do NOT fallback to Main KB)
+            return {
+                "status": "abstain",
+                "message": "No answers found in uploaded document."
+            }
+
+        # --- MODE 2: STANDARD (Main -> User) ---
         # Tier 1: Main KB (PRIORITY: System Guidelines)
         print("[INFO] Searching Main KB (Priority)...")
         if self.main_kb:
@@ -182,7 +198,7 @@ class ScholarBotEngine:
 
 
 
-    def generate_response(self, query: str, model_name: str = "llama3"):
+    def generate_response(self, query: str, model_name: str = "llama3", force_user_kb: bool = False):
         """
         Generative RAG (Ollama):
         1. Retrieve massive context (k=10).
@@ -197,10 +213,10 @@ class ScholarBotEngine:
         # let's assume search() gets enough, or we rely on the 7 chunks being "good enough".
         # WAIT, user said "retrieve 10 chunks". I MUST update search to k=10.
         
-        retrieval = self.search(query) # I will update search k below
+        retrieval = self.search(query, force_user_kb=force_user_kb) # I will update search k below
         
         if retrieval["status"] == "abstain":
-             return "Final Answer: No confidence in answering.", 0.0
+             return "Final Answer: No confidence in answering.", 0.0, {}
 
         ctx = retrieval["excerpt_1"]
         raw_meta = retrieval["excerpt_2"]
@@ -224,7 +240,7 @@ class ScholarBotEngine:
             1. Write a cohesive, well-structured essay/summary. Do not just list snippets.
             2. Use professional medical tone.
             3. If the context mentions specific studies or drugs (e.g. Bedaquiline), name them.
-            4. At the end, cite the provided source metadata.
+            4. Do NOT explicitly list the source metadata at the end of your text (it is displayed separately).
             
             Context:
             {context}
@@ -262,7 +278,7 @@ class ScholarBotEngine:
         excerpt_2 = f"**Excerpt 2 (Source Metadata)**:\n**Title**: {title}\n**Author**: {author}\n**Year**: {year}"
         
         ans = f"{excerpt_1}\n\n---\n\n{excerpt_2}"
-        return ans, retrieval['confidence']
+        return ans, retrieval['confidence'], refined_meta
 
 if __name__ == "__main__":
     engine = ScholarBotEngine()

@@ -6,42 +6,45 @@ import shutil
 
 # Page Configuration
 st.set_page_config(
-    page_title="ScholarBot (TB & Pneumonia)",
-    page_icon="🩺",
+    page_title="ScholarBot (Clinical RAG)",
+    page_icon=None,
     layout="wide"
 )
 
+# Initialize Session State
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+if "has_upload" not in st.session_state:
+    st.session_state["has_upload"] = False
+
 # Load Backend (RAG Engine)
-# Dynamic import to handle the "04_" prefix
 engine_spec = importlib.util.spec_from_file_location("rag", Path(__file__).parent / "04_engine.py")
 rag = importlib.util.module_from_spec(engine_spec)
 engine_spec.loader.exec_module(rag)
 
-# Load Ingestion Logic for User Uploads
+# Load Ingestion Logic
 ingest_spec = importlib.util.spec_from_file_location("ingest", Path(__file__).parent / "03_ingest_user.py")
 ingest = importlib.util.module_from_spec(ingest_spec)
 ingest_spec.loader.exec_module(ingest)
 
-# Initialize Session State
+# Initialize Engine
 if "engine" not in st.session_state:
     with st.spinner("Initializing RAG Engine..."):
         st.session_state.engine = rag.ScholarBotEngine()
-        
-if "messages" not in st.session_state:
-    st.session_state.messages = []
 
 # Sidebar - Configuration & Upload
 with st.sidebar:
-    st.title("🩺 Control Panel")
+    st.title("Control Panel")
     st.markdown("---")
     
     st.header("Upload Document")
     uploaded_file = st.file_uploader("Add to Knowledge Base (PDF)", type=["pdf"])
     
     st.markdown("---")
-    st.header("🧠 AI Brain (Local)")
+    st.header("AI Brain (Local)")
     model_name = st.text_input("Ollama Model Name", value="llama3")
-    st.caption("Ensure Ollama is running locally!")
+    st.caption("Ensure Ollama is running locally.")
 
     if uploaded_file:
         if st.button("Ingest Document"):
@@ -59,11 +62,14 @@ with st.sidebar:
                 # Reload Engine to pick up new index
                 st.session_state.engine = rag.ScholarBotEngine()
                 
+                # Set Upload Flag for Context-Aware Search
+                st.session_state["has_upload"] = True
+                
                 # Cleanup
                 if temp_path.exists():
                     os.remove(temp_path)
                     
-                st.success(f"Ingested {uploaded_file.name}!")
+                st.success(f"Ingested {uploaded_file.name}.")
 
     st.markdown("---")
     st.info("**Scope**: Tuberculosis & Pneumonia\n\n**Data Sources**:\n- WHO Guidelines\n- User Uploads")
@@ -91,7 +97,8 @@ if prompt := st.chat_input("Ask a clinical question..."):
         with st.spinner("Thinking..."):
             # Pass the model_name
             # expects: content, confidence, meta
-            response, confidence, meta = st.session_state.engine.generate_response(prompt, model_name=model_name)
+            force_user_kb = st.session_state.get("has_upload", False)
+            response, confidence, meta = st.session_state.engine.generate_response(prompt, model_name=model_name, force_user_kb=force_user_kb)
             
             st.markdown(response)
             
