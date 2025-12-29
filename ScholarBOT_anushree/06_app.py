@@ -36,21 +36,15 @@ if "engine" not in st.session_state:
 # Sidebar - Configuration & Upload
 with st.sidebar:
     st.title("Control Panel")
-    st.markdown("---")
     
-    st.header("Upload Document")
+    # 1. Upload Document (Primary Action)
+    st.markdown("### 1. Upload Document")
     uploaded_file = st.file_uploader("Add to Knowledge Base (PDF)", type=["pdf"])
     
-    st.markdown("---")
-    st.header("AI Brain (Local)")
-    model_name = st.text_input("Ollama Model Name", value="llama3")
-    st.caption("Ensure Ollama is running locally.")
-
     if uploaded_file:
-        if st.button("Ingest Document"):
+        if st.button("Ingest Uploaded Document"):
             with st.spinner(f"Ingesting {uploaded_file.name}..."):
                 # Save to temp
-                # Save to temp with original name (sanitized)
                 safe_name = "".join([c for c in uploaded_file.name if c.isalnum() or c in (' ', '.', '_', '-')]).strip()
                 temp_path = Path(safe_name)
                 with open(temp_path, "wb") as f:
@@ -72,7 +66,11 @@ with st.sidebar:
                 st.success(f"Ingested {uploaded_file.name}.")
 
     st.markdown("---")
-    st.info("**Scope**: Tuberculosis & Pneumonia\n\n**Data Sources**:\n- WHO Guidelines\n- User Uploads")
+    
+    # 2. Metadata (Secondary)
+    st.caption("**System Info**")
+    model_name = st.text_input("Model", value="llama3")
+    st.caption(f"Running on: Local Ollama\n\n**Data Sources**:\n- WHO Guidelines\n- User Uploads")
 
 # Main Chat Interface
 st.title("ScholarBot Assistant")
@@ -98,13 +96,19 @@ if prompt := st.chat_input("Ask a clinical question..."):
             # Pass the model_name
             # expects: content, confidence, meta
             force_user_kb = st.session_state.get("has_upload", False)
-            response, confidence, meta = st.session_state.engine.generate_response(prompt, model_name=model_name, force_user_kb=force_user_kb)
+            # Pass history (excluding current user prompt which is already in query, but logic handles it)
+            # We want history of *previous* turns. 
+            # Current st.session_state.messages includes the new user prompt at the end (appended at line 68).
+            # So pass all of it.
+            response, confidence, meta = st.session_state.engine.generate_response(prompt, model_name=model_name, force_user_kb=force_user_kb, history=st.session_state.messages[:-1])
             
             st.markdown(response)
             
             # Show Refined Citation (Flat Layout)
             st.markdown("---")
-            st.subheader("📄 Source Document")
+            # Show Refined Citation (Flat Layout)
+            st.markdown("---")
+            st.markdown("**Source Document**") # Subtle header
             st.markdown(f"**Title**: {meta.get('title', 'Unknown')}")
             st.markdown(f"**File**: `{meta.get('source', 'Unknown')}`")
             

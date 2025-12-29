@@ -43,7 +43,45 @@ class ScholarBotEngine:
             
         if self.user_kb:
             print("[OK] User KB loaded.")
+            
+    def rewrite_query(self, query: str, history: List[Dict], model_name: str = "llama3") -> str:
+        """
+        Uses LLM to rewrite the query contextually based on chat history.
+        "Tell me more" -> "Tell me more about [Previous Answer Topic]"
+        """
+        if not history:
+            return query
+            
+        # Only look at the last interaction (User Q + Assistant A)
+        # Assuming history format: [{"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}]
+        short_hist = history[-2:] if len(history) >= 2 else history
         
+        context_str = ""
+        for msg in short_hist:
+            role = "Human" if msg["role"] == "user" else "Assistant"
+            context_str += f"{role}: {msg['content']}\n"
+            
+        sys_prompt = """Task: Rewrite the user's latest question to be self-contained, using context from the chat history.
+        Do NOT answer the question. Just rewrite it for a search engine.
+        Example:
+        History: Human: What is TB? Assistant: TB is... Human: How is it treated?
+        Rewrite: How is Tuberculosis treated?
+        """
+        
+        try:
+            llm = ChatOllama(model=model_name, temperature=0)
+            prompt = ChatPromptTemplate.from_messages([
+                ("system", sys_prompt),
+                ("human", f"History:\n{context_str}\n\nLatest Question: {query}\n\nRewrite:")
+            ])
+            chain = prompt | llm
+            rewritten = chain.invoke({}).content.strip()
+            print(f"[INFO] Rewritten Query: '{query}' -> '{rewritten}'")
+            return rewritten
+        except Exception as e:
+            print(f"[WARN] Rewrite failed: {e}")
+            return query
+
     def _format_apa_citation(self, meta: Dict) -> str:
         author = meta.get("author", "Unknown Author")
         year = meta.get("year", "n.d.")
@@ -198,22 +236,18 @@ class ScholarBotEngine:
 
 
 
-    def generate_response(self, query: str, model_name: str = "llama3", force_user_kb: bool = False):
+    def generate_response(self, query: str, model_name: str = "llama3", force_user_kb: bool = False, history: List[Dict] = []):
         """
         Generative RAG (Ollama):
-        1. Retrieve massive context (k=10).
-        2. Use Local Ollama Model to synthesize.
+        1. Contextualize Query (Rewrite).
+        2. Retrieve massive context (k=10).
+        3. Use Local Ollama Model to synthesize.
         """
-        # User requested 10 chunks
-        retrieval_k = 10
+        # 1. Contextualize
+        refined_query = self.rewrite_query(query, history, model_name)
         
-        # NOTE: self.search currently hardcodes k=7 inside. 
-        # To respect the user request without "meddling" too much,
-        # we honestly should have updated search() to accept k, but for now
-        # let's assume search() gets enough, or we rely on the 7 chunks being "good enough".
-        # WAIT, user said "retrieve 10 chunks". I MUST update search to k=10.
-        
-        retrieval = self.search(query, force_user_kb=force_user_kb) # I will update search k below
+        # 2. Search
+        retrieval = self.search(refined_query, force_user_kb=force_user_kb)
         
         if retrieval["status"] == "abstain":
              return "Final Answer: No confidence in answering.", 0.0, {}
