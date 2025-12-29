@@ -34,7 +34,8 @@ def generate_visual_prompt(medical_answer: str, model_name: str = "llama3") -> s
         2. CONTENT: Focus on anatomical or structural clarity (e.g. cross-section of lung, microscopic view of bacteria).
         3. STRICTLY FORBIDDEN: Any form of text, labels, letters, numbers, or watermarks. The image must be purely visual.
         4. TONE: Serious, clinical, educational.
-        5. Output ONLY the visual description string.
+        5. LENGTH: Keep it CONCISE (under 40 words) to avoid API errors.
+        6. Output ONLY the visual description string.
         """
         
         prompt = ChatPromptTemplate.from_messages([
@@ -63,15 +64,20 @@ def generate_image(visual_prompt: str, text_overlay: str = ""):
     try:
         # 1. Clean Prompt for URL
         # Pollinations handles spaces, but let's be safe.
-        safe_prompt = visual_prompt.replace("\n", " ")
+        safe_prompt = visual_prompt.replace("\n", " ").replace(":", "").replace("/", "")
+        
+        # SAFETY: Aggressive Truncation (400 chars)
+        if len(safe_prompt) > 400:
+            print("[WARN] Prompt too long, truncating to 400 chars.")
+            safe_prompt = safe_prompt[:400]
         
         # Style boosters - Textbook Quality & Anti-Text
         full_prompt = f"{safe_prompt}, scientific illustration, highly detailed, anatomical, medical textbook style, 4k, realistic texture, soft lighting, no text, no labels, no watermarks"
         
-        # 2. Build URL
-        # Docs: https://github.com/pollinations/pollinations/blob/master/APIDOCS.md
-        # Format: https://image.pollinations.ai/prompt/{prompt}?width={w}&height={h}&seed={seed}&nologo=true
-        url = f"https://image.pollinations.ai/prompt/{full_prompt}?width=1024&height=1024&nologo=true&state=done"
+        # 3. Build URL with Encoding
+        import urllib.parse
+        encoded_prompt = urllib.parse.quote(full_prompt)
+        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true&state=done"
         
         print(f"[INFO] Fetching from Pollinations: {url}")
         
