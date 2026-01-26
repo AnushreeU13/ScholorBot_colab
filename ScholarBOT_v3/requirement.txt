@@ -1,0 +1,24 @@
+# --- Frontend / UI ---
+streamlit>=1.30.0
+
+# --- Core Logic & Vectors ---
+numpy>=1.24.0
+# Note: Use 'faiss-gpu' if you have a supported NVIDIA GPU, otherwise 'faiss-cpu'
+faiss-cpu>=1.7.4
+
+# --- Deep Learning & Embeddings (MedCPT) ---
+torch>=2.0.0
+transformers>=4.30.0
+
+# --- Document Processing ---
+PyPDF2>=3.0.0  # Used in pdf_utils.py
+beautifulsoup4>=4.12.0  # Used in download_cdc_tb_guidance.py
+
+# --- Networking & APIs ---
+requests>=2.31.0  # Used in illustrator.py and downloads
+openai>=1.10.0  # Used in rag_pipeline_aligned.py (Hybrid mode)
+
+# --- Illustrator / Experimental ---
+Pillow>=10.0.0  # Image processing
+langchain-community>=0.0.10  # Used in illustrator.py
+langchain-core>=0.1.0        # Used in illustrator.py
