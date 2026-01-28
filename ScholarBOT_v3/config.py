@@ -33,9 +33,9 @@ XRAY_FOLDER = Path(os.getenv("SCHOLARBOT_XRAY_DIR", DATA_DIR / "xray")).resolve(
 # =============================
 # KB store names (single source of truth)
 # =============================
-KB_DRUGLABELS = "kb_druglabels_medcpt"
-KB_GUIDELINES = "kb_guidelines_medcpt"
-KB_USER_FACT = "user_fact_kb_medcpt"
+KB_DRUGLABELS = "main_kb"
+KB_GUIDELINES = "main_kb"
+KB_USER_FACT = "user_kb"
 
 # =============================
 # Chunking

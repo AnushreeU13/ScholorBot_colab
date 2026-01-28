@@ -45,81 +45,44 @@ if ingest_clicked:
 if "history" not in st.session_state:
     st.session_state.history = []
 
+# --- Chatbot Interface ---
 st.divider()
-query = st.text_input("Ask a clinical question (TB / pneumonia / drug labels supported):", value="")
-ask = st.button("Ask")
 
-if ask and query.strip():
-    with st.spinner("Retrieving evidence and generating answer..."):
-        response_text, confidence, meta = engine.generate_response(
-            query=query.strip(),
-            model_name="",
-            force_user_kb=force_user_kb,
-            history=st.session_state.history,
-        )
+# Display chat history
+for msg in st.session_state.history:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
 
-    col1, col2 = st.columns([2, 1], gap="large")
+# Chat input
+if query := st.chat_input("Ask a clinical question (TB / pneumonia / drug labels supported)"):
+    # Add user message
+    st.session_state.history.append({"role": "user", "content": query})
+    with st.chat_message("user"):
+        st.markdown(query)
 
-    with col1:
-        # Main product-friendly output (paragraphs)
-        st.markdown(response_text)
-
-        # NEW: Claim -> snippet alignment (paper-style)
-        with st.expander("Claim → Supporting snippet (paper-style trace)", expanded=True):
-            items = meta.get("claim_snippets", []) or []
-            if not items:
-                st.info("No claim-snippet alignment available (likely abstain or missing evidence chunks).")
-            else:
-                for i, it in enumerate(items, 1):
-                    claim = it.get("claim", "").strip()
-                    snippet = it.get("snippet", "").strip()
-                    citation = it.get("citation", "").strip()
-                    score = it.get("score", 0.0)
-
-                    st.markdown(f"**Claim {i}:** {claim}")
-                    if snippet:
-                        st.markdown(f"> {snippet}")
-                    if citation:
-                        st.caption(f"Source: {citation}   |   overlap score={score:.3f}")
-                    st.divider()
-
-        with st.expander("Show original claim bullets (for debugging)", expanded=False):
-            cb = meta.get("clinician_bullets", "").strip()
-            pb = meta.get("patient_bullets", "").strip()
-            if cb:
-                st.markdown("**Clinician claim bullets**")
-                st.code(cb)
-            if pb:
-                st.markdown("**Patient claim bullets**")
-                st.code(pb)
-
-        with st.expander("Show evidence (citations)", expanded=False):
-            refs = meta.get("references", []) or []
-            if not refs:
-                st.info("No citations returned.")
-            else:
-                for r in refs:
-                    st.write("-", r)
-
-        with st.expander("Show routing + system metadata", expanded=False):
-            st.json(
-                {
-                    "status": meta.get("status"),
-                    "source": meta.get("source"),
-                    "route": meta.get("route", {}),
-                    "zero_hallucination_mode": meta.get("zero_hallucination_mode"),
-                    "reason": meta.get("reason", None),
-                }
+    # Generate response
+    with st.chat_message("assistant"):
+        with st.spinner("Retrieving evidence and generating answer..."):
+            response_text, confidence, meta = engine.generate_response(
+                query=query.strip(),
+                model_name="",
+                force_user_kb=force_user_kb,
+                history=st.session_state.history,
             )
-
-    with col2:
-        st.metric("Confidence (retrieval)", f"{confidence:.3f}")
-        st.write("**Status:**", meta.get("status", "unknown"))
-        st.write("**Source KBs:**", meta.get("source", "Unknown"))
-
+        
+        # Display Answer
+        st.markdown(response_text)
+        
+        # Add citations cleanly (optional, since debug expanders are removed)
+        refs = meta.get("references", [])
+        if refs:
+            st.caption(f"Sources: {', '.join(refs[:3])}" + ("..." if len(refs)>3 else ""))
+        
+        # Add metadata footer
         if meta.get("status") == "abstain":
-            st.warning("Abstained due to insufficient evidence under current safety settings.")
+            st.warning("Abstained due to insufficient evidence.")
+        else:
+            st.caption(f"Confidence: {confidence:.2f} | Status: {meta.get('status')} | Source: {meta.get('source')}")
 
-    # Save history
-    st.session_state.history.append({"role": "user", "content": query.strip()})
+    # Add assistant message
     st.session_state.history.append({"role": "assistant", "content": response_text})
