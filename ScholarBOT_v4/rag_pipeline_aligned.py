@@ -581,12 +581,13 @@ class RAGPipeline:
                     "store": kb_name
                 })
 
-        # Drug anchor filter
-        before = len(candidates)
-        candidates = _filter_candidates_by_drug_anchor(candidates, query)
-        after = len(candidates)
-        if before != after:
-            self._log(f"[RAG] Anchor filter kept {after} candidates (dropped {before-after}).")
+        # Drug anchor filter (DISABLED per v2 logic)
+        # before = len(candidates)
+        # candidates = _filter_candidates_by_drug_anchor(candidates, query)
+        # after = len(candidates)
+        # if before != after:
+        #     self._log(f"[RAG] Anchor filter kept {after} candidates (dropped {before-after}).")
+        pass
 
         candidates.sort(key=lambda x: x["score"], reverse=True)
         top_chunks = candidates[:self.top_k]
@@ -605,17 +606,21 @@ class RAGPipeline:
                     final_chunks = inter_only
                     self._log(f"[RAG] Section Isolation: {len(top_chunks)} -> {len(final_chunks)} (interactions)")
 
-        # Guideline diagnosis gate (key)
-        if decision.intent in ("guideline", "mixed") and ("diagnosis" in task_hints):
-            gated = _guideline_diagnosis_gate(final_chunks)
-            if gated:
-                self._log(f"[RAG] Guideline Diagnosis Gate: {len(final_chunks)} -> {len(gated)}")
-                final_chunks = gated[:self.top_k]
-            else:
-                self._log("[RAG] Guideline Diagnosis Gate: no matching evidence -> ABSTAIN.")
-                return self._build_abstain_result(query, decision)
+        # Guideline diagnosis gate (DISABLED per v2 logic)
+        # if decision.intent in ("guideline", "mixed") and ("diagnosis" in task_hints):
+        #     gated = _guideline_diagnosis_gate(final_chunks)
+        #     if gated:
+        #         self._log(f"[RAG] Guideline Diagnosis Gate: {len(final_chunks)} -> {len(gated)}")
+        #         final_chunks = gated[:self.top_k]
+        #     else:
+        #         self._log("[RAG] Guideline Diagnosis Gate: no matching evidence -> Fallback (soft).")
+        pass
 
-        best_score = final_chunks[0]["score"] if final_chunks else 0.0
+
+        if not final_chunks:
+            self._log("[RAG] No chunks retrieved (final_chunks empty).")
+        
+        best_score = final_chunks[0]["score"] if final_chunks else 0.0    
         required = KB_SIM_THRESHOLD.get(final_chunks[0]["store"], 0.65) if final_chunks else 0.7
         if not final_chunks or best_score < required:
             self._log(f"[RAG] Low confidence ({best_score:.3f} < {required}) -> ABSTAIN.")
@@ -718,14 +723,13 @@ Rules additions (guideline):
 """.strip()
 
         prompt = f"""
-Task: Answer the QUESTION using ONLY the EVIDENCE.
+Task: Answer the QUESTION using the EVIDENCE provided.
 
-Rules (strict):
-1) Answer using **ONLY** the verified snippets below.
-2) If the answer is not contained in the snippets, output "ABSTAIN". Do **NOT** use outside knowledge.
-3) Output ONLY bullet points.
-4) Each bullet must start with "- " (dash + space).
-5) 3 to 8 bullets preferred.
+Rules:
+1) Output bullet points.
+2) Each bullet must start with "- ".
+3) Synthesize the answer from the snippets. If the exact answer isn't stated but can be inferred, include it.
+4) Do not add external knowledge not found in the evidence.
 
 {negative}
 
@@ -737,6 +741,8 @@ EVIDENCE:
 
 CLINICIAN OUTPUT:
 """.strip()
+
+        self._log(f"[DEBUG] LLM PROMPT EVIDENCE:\n{context[:500]}...") # Log first 500 chars
 
         raw = _generate_with_prompt(prompt, max_new_tokens=240)
 

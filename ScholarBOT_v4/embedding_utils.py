@@ -125,5 +125,8 @@ class MedCPTDualEmbedder:
         return np.vstack(all_vecs)
 
 
+    # Alias for LangChain compatibility
+    embed_documents = embed_texts
+
 # Backward-compatible alias
 MedCPTEmbedder = MedCPTDualEmbedder

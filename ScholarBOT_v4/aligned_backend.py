@@ -266,9 +266,12 @@ class AlignedScholarBotEngine:
 
         if print_kb_stats:
             print(f"[KB] FAISS_INDICES_DIR = {Path(FAISS_INDICES_DIR).resolve()}")
-            print(f"[KB] guidelines ntotal = {_ntotal(self.kb_guidelines)}")
-            print(f"[KB] druglabels ntotal = {_ntotal(self.kb_druglabels)}")
-            print(f"[KB] user_fact ntotal = {_ntotal(self.user_kb)}")
+            g_n = _ntotal(self.kb_guidelines)
+            d_n = _ntotal(self.kb_druglabels)
+            u_n = _ntotal(self.user_kb)
+            print(f"[KB] guidelines ntotal = {g_n}")
+            print(f"[KB] druglabels ntotal = {d_n}")
+            print(f"[KB] user_fact ntotal = {u_n}")
 
         self.pipeline = RAGPipeline(
             query_embedder=self.embedder,

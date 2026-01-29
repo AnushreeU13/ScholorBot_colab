@@ -13,9 +13,11 @@ def create_faiss_store(store_name: str, dimension: int, base_dir: str):
     embedder = MedCPTDualEmbedder()
     
     if path.exists() and (path / "index.faiss").exists():
+        print(f"[storage_utils] Loading existing FAISS index from: {path}")
         # Load existing
         return FAISS.load_local(str(path), embedder, allow_dangerous_deserialization=True)
     
+    print(f"[storage_utils] Index NOT found at {path}. Creating new empty index.")
     # Create new empty index
     index = faiss.IndexFlatIP(dimension)
     return FAISS(

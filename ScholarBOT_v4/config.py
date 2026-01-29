@@ -51,11 +51,11 @@ GUIDELINE_CHUNK_OVERLAP = 50
 # =============================
 TOP_K = 8
 
-DEFAULT_SIM_THRESHOLD = 0.70
+DEFAULT_SIM_THRESHOLD = 0.40
 KB_SIM_THRESHOLD = {
-    KB_DRUGLABELS: 0.70,
-    KB_GUIDELINES: 0.60,
-    KB_USER_FACT: 0.70,
+    KB_DRUGLABELS: 0.40,
+    KB_GUIDELINES: 0.40,
+    KB_USER_FACT: 0.40,
 }
 
 # =============================

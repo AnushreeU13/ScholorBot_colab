@@ -10,10 +10,13 @@ KB_USER_FACT = "user_kb"
 TOP_K = 8
 
 KB_SIM_THRESHOLD = {
-    "main_kb": 0.50,
-    "user_kb": 0.60,
+    "main_kb": 0.35,
+    "user_kb": 0.35,
+    "user_fact_kb_medcpt": 0.35,
+    "kb_druglabels_medcpt": 0.35,
+    "kb_guidelines_medcpt": 0.35,
 }
 
-DEFAULT_SIM_THRESHOLD = 0.65
+DEFAULT_SIM_THRESHOLD = 0.35
 ZERO_HALLUCINATION_MODE = False
 USE_CLINICIAN_LLM = True

@@ -15,7 +15,9 @@ Key fix:
 
 from __future__ import annotations
 from dataclasses import dataclass
+from dataclasses import dataclass
 from typing import List
+import re
 
 
 @dataclass
@@ -95,7 +97,12 @@ def route_query(query: str, user_uploaded_available: bool = False) -> RouteDecis
     if any(t in q for t in _TASK_PREVENTION):
         task_hints.append("prevention")
 
+    # Regex for robust boundary detection (fixes "TB?" or "TB!")
     has_guide_domain = any(t in q for t in _GUIDE_DOMAIN_TRIGGERS)
+    if not has_guide_domain:
+        # Fallback to regex for short acronyms
+        if re.search(r"\b(tb|cap)\b", q):
+            has_guide_domain = True
     has_drug = any(t in q for t in _DRUG_TRIGGERS)
     has_ood = any(t in q for t in _OUT_OF_DOMAIN_TRIGGERS)
 
