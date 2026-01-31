@@ -379,6 +379,7 @@ class AlignedScholarBotEngine:
 
             # NEW: snippet alignment payload
             "claim_snippets": claim_snippets,
+            "evidence_chunks": evidence_chunks,
         }
 
         if force_user_kb and meta.get("status") == "abstain":

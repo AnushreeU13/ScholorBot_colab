@@ -576,7 +576,7 @@ class RAGPipeline:
                 candidates.append({
                     "score": float(boosted[i]),
                     "raw_sim": float(sims[i]),
-                    "text": metas[i].get("text", ""),
+                    "text": texts[i],
                     "metadata": metas[i],
                     "store": kb_name
                 })

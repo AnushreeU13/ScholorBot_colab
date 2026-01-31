@@ -1,11 +1,11 @@
 """
-ragas_v4.py
+ragas_v5.py
 
-Implements RAGAS evaluation metrics for ScholarBOT v4.
+Implements RAGAS evaluation metrics for ScholarBOT v5 (Llama 3 + v4 retrieval).
 Requires OPENAI_API_KEY to be set in the environment for the *Evaluator* (RAGAS Judge).
 
 Integration:
-- Uses v4 AlignedScholarBotEngine for generation.
+- Uses v5 AlignedScholarBotEngine for generation.
 - Uses RAGAS for evaluation (Faithfulness, Answer Relevancy, Context Precision/Recall).
 """
 
@@ -22,15 +22,14 @@ from ragas.metrics import (
 )
 import logging
 
-# Add current dir to path to find v4 modules
+# Add current dir to path to find v5 modules
 sys.path.append(os.getcwd())
 
-# Import v4 Backend
-# Ensure aligned_backend.py exists in this directory
+# Import v5 Backend
 try:
     from aligned_backend import AlignedScholarBotEngine
 except ImportError:
-    print("Error: Could not import AlignedScholarBotEngine. Run this script from ScholarBOT_v4 directory.")
+    print("Error: Could not import AlignedScholarBotEngine. Run this script from ScholarBOT_v5 directory.")
     sys.exit(1)
 
 
@@ -45,7 +44,7 @@ def run_evaluation_suite(
 ) -> pd.DataFrame:
     """
     Runs end-to-end evaluation:
-    1. Generates answers using ScholarBOT v4 (Llama 3 / Local).
+    1. Generates answers using ScholarBOT v5 (Llama 3).
     2. Evaluates them using RAGAS (GPT-4o/mini Judge).
     """
 
@@ -59,8 +58,8 @@ def run_evaluation_suite(
     if not os.getenv("OPENAI_API_KEY"):
         logger.warning("OPENAI_API_KEY not found. RAGAS evaluation (The Judge) will likely fail.")
 
-    # 2. Initialize v4 Engine
-    logger.info("Initializing ScholarBOT v4 Engine...")
+    # 2. Initialize v5 Engine
+    logger.info("Initializing ScholarBOT v5 Engine...")
     engine = AlignedScholarBotEngine(verbose=False) # Suppress debug logs for clean eval output
 
     questions = []
@@ -71,19 +70,24 @@ def run_evaluation_suite(
     logger.info(f"Generating answers for {len(test_questions)} questions...")
     for q in test_questions:
         try:
-            # Generate using v4 pipeline
+            # Generate using v5 pipeline
             response, conf, meta = engine.generate_response(q)
             
             # Extract Evidence Chunks for RAGAS
-            # meta should contain 'evidence_chunks' if aligned_backend is patched
+            # debug_info usually contains the chunks in 'evidence_chunks' if configured
+            # But generate_response returns (text, float, dict)
+            # We need the raw chunks. The `meta` dict currently returns 'status' etc.
+            # We might need to access the pipeline details more directly or trust the returned meta if it has chunk info.
+            
+            # For v5 aligned_backend.py:
+            # result = self.pipeline.retrieve_and_answer(query)
+            # return result.answer, result.confidence, result.debug_info
+            
             evidence_text_list = []
             if meta and "evidence_chunks" in meta:
                  evidence_text_list = [c.get("text", "") for c in meta["evidence_chunks"]]
-            elif meta and "claim_snippets" in meta:
-                 # Fallback: try to reconstruct from claim snippets if available
-                 evidence_text_list = [c.get("snippet", "") for c in meta["claim_snippets"]]
-            
-            if not evidence_text_list:     
+            else:
+                # Fallback if chunks aren't passed cleanly
                 evidence_text_list = ["No context captured."]
 
             questions.append(q)
@@ -103,15 +107,10 @@ def run_evaluation_suite(
         "contexts": contexts,
     }
     if ground_truths:
-        # Ground truths must be list of lists for RAGAS? 
-        # Actually RAGAS expects 'ground_truth' (singular) as column name but passing list of strings usually works for single reference
-        # v5 script passed "ground_truths" arg which was list[str]
-        # But data["ground_truth"] needs to be aligned.
-        # Let's check v5: data["ground_truth"] = ground_truths (list of strings).
-        # RAGAS documentation says ground_truth is usually string or list[str].
         data["ground_truth"] = ground_truths
         metrics = [faithfulness, answer_relevancy, context_precision, context_recall]
     else:
+        # Without ground truth, we can only measure faithfulness & relevancy (and partial precision)
         metrics = [faithfulness, answer_relevancy, context_precision]
 
     dataset = Dataset.from_dict(data)
@@ -139,12 +138,11 @@ def run_evaluation_suite(
         return results.to_pandas()
     except Exception as e:
         logger.error(f"RAGAS evaluation failed: {e}")
-        # Return dataframe with generation results even if metrics fail
-        return pd.DataFrame(data)
+        return pd.DataFrame()
 
 
 if __name__ == "__main__":
-    print("=== ScholarBOT v4 RAGAS Evaluation ===")
+    print("=== ScholarBOT v5 RAGAS Evaluation ===")
     
     # 1. Define Test Set (Expanded List)
     test_questions = [
@@ -218,8 +216,8 @@ if __name__ == "__main__":
         print(f"Columns: {df.columns.tolist()}")
         
         # Save raw first
-        df.to_csv("ragas_v4_results.csv", index=False)
-        print("\nSaved detailed results to ragas_v4_results.csv")
+        df.to_csv("ragas_v5_results.csv", index=False)
+        print("\nSaved detailed results to ragas_v5_results.csv")
         
         # Display subset if columns exist
         candidates = ["user_input", "question", "faithfulness", "answer_relevancy", "context_precision", "context_recall"]
